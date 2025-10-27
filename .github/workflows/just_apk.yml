@@ -24,6 +24,14 @@ jobs:
         run: |
           git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git "$GITHUB_WORKSPACE/depot_tools"
           echo "$GITHUB_WORKSPACE/depot_tools" >> "$GITHUB_PATH"
+          
+      - name: Bootstrap depot_tools
+        env:
+          DEPOT_TOOLS_UPDATE: 1
+          DEPOT_TOOLS_METRICS: 0
+        run: |
+          python3 "$GITHUB_WORKSPACE/depot_tools/update_depot_tools" || true
+          gclient --version
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
