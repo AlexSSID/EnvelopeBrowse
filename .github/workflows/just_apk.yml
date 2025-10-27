@@ -14,10 +14,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Install dependencies
+      - name: Install base deps
         run: |
           sudo apt-get update
-          sudo apt-get install -y ninja-build python3 git openjdk-17-jdk unzip
+          sudo apt-get install -y git python3 unzip zip curl openjdk-17-jdk ninja-build
+
+      # ⬇⬇⬇ ВАЖНО: ставим depot_tools (даёт gn и autoninja) и добавляем в PATH
+      - name: Install depot_tools (gn, autoninja)
+        run: |
+          git clone --depth=1 https://chromium.googlesource.com/chromium/tools/depot_tools.git "$GITHUB_WORKSPACE/depot_tools"
+          echo "$GITHUB_WORKSPACE/depot_tools" >> "$GITHUB_PATH"
 
       - name: Setup Android SDK
         uses: android-actions/setup-android@v3
@@ -36,13 +42,12 @@ jobs:
           is_debug = false
           symbol_level = 0
           use_goma = false
-          enable_profiling = false
           ffmpeg_branding = "Chrome"
           proprietary_codecs = true
           enable_widevine = true
           EOF
 
-      - name: Run gn gen
+      - name: gn gen
         run: gn gen out/Default
 
       - name: Build APK
