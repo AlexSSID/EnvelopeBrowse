@@ -1,0 +1,55 @@
+name: Build APK Only
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y ninja-build python3 git openjdk-17-jdk unzip
+
+      - name: Setup Android SDK
+        uses: android-actions/setup-android@v3
+        with:
+          api-level: 34
+          ndk: 26.1.10909125
+          cmake: 3.22.1
+
+      - name: Generate args.gn
+        run: |
+          mkdir -p out/Default
+          cat > out/Default/args.gn <<'EOF'
+          target_os = "android"
+          target_cpu = "arm64"
+          is_official_build = true
+          is_debug = false
+          symbol_level = 0
+          use_goma = false
+          enable_profiling = false
+          ffmpeg_branding = "Chrome"
+          proprietary_codecs = true
+          enable_widevine = true
+          EOF
+
+      - name: Run gn gen
+        run: gn gen out/Default
+
+      - name: Build APK
+        run: autoninja -C out/Default chrome_public_apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome_public_apk
+          path: out/Default/apks/**/*.apk
