@@ -56,9 +56,12 @@ jobs:
           EOF
 
       - name: gn gen
+        working-directory: src
         run: gn gen out/Default
+        
 
       - name: Build APK
+        working-directory: src
         run: autoninja -C out/Default chrome_public_apk
 
       - name: Upload APK artifact
