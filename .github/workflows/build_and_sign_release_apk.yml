@@ -119,11 +119,6 @@ jobs:
       - name: Checking available disk-space
         run: df -h
 
-      - name: Listing files
-        run: |
-          echo $HOME
-          ls -la $HOME/kiwibrowser-next-builds-${{ matrix.platform }}
-
       - name: Uploading APK
         uses: actions/upload-artifact@v4
         with:
