@@ -1,0 +1,77 @@
+name: Build APK (self-hosted)
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: self-hosted  # <— твой агент c большим диском/кэшем
+
+    steps:
+      - name: Checkout this repo (patches/config)
+        uses: actions/checkout@v4
+
+      - name: Install base deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y git python3 unzip zip curl openjdk-17-jdk ninja-build
+
+      - name: Install depot_tools
+        run: |
+          if [ ! -d "$HOME/depot_tools" ]; then
+            git clone https://chromium.googlesource.com/chromium/tools/depot_tools.git "$HOME/depot_tools"
+          fi
+          echo "$HOME/depot_tools" >> "$GITHUB_PATH"
+
+      - name: Bootstrap depot_tools
+        env:
+          DEPOT_TOOLS_UPDATE: "1"
+          DEPOT_TOOLS_METRICS: "0"
+        run: |
+          gclient --version || true
+          python3 "$HOME/depot_tools/update_depot_tools" || true
+
+      - name: Fetch Chromium checkout (first run is very long)
+        run: |
+          mkdir -p "$HOME/chromium" && cd "$HOME/chromium"
+          if [ ! -d src ]; then
+            gclient config --name src https://chromium.googlesource.com/chromium/src.git
+            # Без истории чуть экономнее, но все равно тяжело:
+            gclient sync -D --no-history
+          else
+            gclient sync -D --no-history
+          fi
+
+      - name: Apply your repo patches/files into src (optional)
+        run: |
+          rsync -a --exclude=.git "$GITHUB_WORKSPACE/" "$HOME/chromium/src/"
+
+      - name: Generate args.gn
+        working-directory: $HOME/chromium/src
+        run: |
+          mkdir -p out/Default
+          cat > out/Default/args.gn <<'EOF'
+          target_os = "android"
+          target_cpu = "arm64"
+          is_official_build = true
+          is_debug = false
+          symbol_level = 0
+          use_goma = false
+          ffmpeg_branding = "Chrome"
+          proprietary_codecs = true
+          enable_widevine = true
+          EOF
+
+      - name: gn gen
+        working-directory: $HOME/chromium/src
+        run: gn gen out/Default
+
+      - name: Build APK
+        working-directory: $HOME/chromium/src
+        run: autoninja -C out/Default chrome_public_apk
+
+      - name: Upload APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome_public_apk
+          path: $HOME/chromium/src/out/Default/apks/**/*.apk
